@@ -416,6 +416,12 @@ func (options *ImportOptions) Run() error {
 			}
 			options.GetReporter().PushedGitRepository(options.RepoURL)
 		}
+
+		// TODO: verify that adding the bot twice does not fail or check for its membership first
+		err = options.AddBotAsCollaborator()
+		if err != nil {
+			return err
+		}
 	}
 
 	if options.DryRun {
@@ -701,13 +707,22 @@ func (options *ImportOptions) CreateNewRemoteRepository() error {
 	repoURL := repo.HTMLURL
 	options.GetReporter().PushedGitRepository(repoURL)
 
+	return options.AddBotAsCollaborator()
+}
+
+// AddBotAsCollaborator adds the pipeline bot as collaborator to the repository
+func (options *ImportOptions) AddBotAsCollaborator() error {
+	details := &options.GitDetails
+	authConfigSvc, err := options.GitLocalAuthConfigService()
+	if err != nil {
+		return err
+	}
 	githubAppMode, err := options.IsGitHubAppMode()
 	if err != nil {
 		return err
 	}
 
 	if !githubAppMode {
-
 		// If the user creating the repo is not the pipeline user, add the pipeline user as a contributor to the repo
 		if options.PipelineUserName != options.GitUserAuth.Username && options.GitServer != nil && options.GitServer.URL == options.PipelineServer {
 			// Make the invitation
@@ -762,7 +777,6 @@ func (options *ImportOptions) CreateNewRemoteRepository() error {
 
 		}
 	}
-
 	return nil
 }
 
