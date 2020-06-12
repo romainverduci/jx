@@ -713,10 +713,6 @@ func (options *ImportOptions) CreateNewRemoteRepository() error {
 // AddBotAsCollaborator adds the pipeline bot as collaborator to the repository
 func (options *ImportOptions) AddBotAsCollaborator() error {
 	details := &options.GitDetails
-	authConfigSvc, err := options.GitLocalAuthConfigService()
-	if err != nil {
-		return err
-	}
 	githubAppMode, err := options.IsGitHubAppMode()
 	if err != nil {
 		return err
@@ -726,18 +722,25 @@ func (options *ImportOptions) AddBotAsCollaborator() error {
 		// If the user creating the repo is not the pipeline user, add the pipeline user as a contributor to the repo
 		if options.PipelineUserName != options.GitUserAuth.Username && options.GitServer != nil && options.GitServer.URL == options.PipelineServer {
 			// Make the invitation
-			err := options.GitProvider.AddCollaborator(options.PipelineUserName, details.Organisation, details.RepoName)
+			err := options.GitProvider.AddCollaborator(options.PipelineUserName, options.Organisation, options.Repository)
 			if err != nil {
 				return err
 			}
 
 			// If repo is put in an organisation that the pipeline user is not part of an invitation needs to be accepted.
 			// Create a new provider for the pipeline user
-			authConfig := authConfigSvc.Config()
+			authConfig := &auth.AuthConfig{
+				PipeLineUsername: options.PipelineUserName,
+				PipeLineServer:   options.PipelineServer,
+				Servers:          []*auth.AuthServer{options.GitServer},
+			}
 			if err != nil {
 				return err
 			}
-			pipelineUserAuth := authConfig.FindUserAuth(options.GitServer.URL, options.PipelineUserName)
+			pipelineUserAuth, err := options.PickPipelineUserAuth(authConfig, options.GitServer)
+			if err != nil {
+				return err
+			}
 			if pipelineUserAuth == nil {
 				log.Logger().Warnf("Pipeline Git user credentials not found. %s will need to accept the invitation to collaborate"+
 					"on %s if %s is not part of %s.\n",
